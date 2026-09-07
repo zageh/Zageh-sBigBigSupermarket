@@ -1,0 +1,135 @@
+import torch
+import torch.nn as nn
+
+import math
+
+class Expert(nn.Module):
+    def __init__(self, d_model, d_ffn):
+        super().__init__()
+
+        self.ffn = nn.Sequential(
+            nn.Linear(d_model, d_ffn),
+            nn.GELU(),
+            nn.Linear(d_ffn, d_model)
+        )
+
+    def forward(self, x):
+        return self.ffn(x)
+    
+class Router(nn.Module):
+    def __init__(self, d_model, num_experts):
+        super().__init__()
+        
+        self.gate = nn.Linear(d_model, num_experts)
+        
+    def forward(self, x):
+        logits = self.gate(x)
+        prob = torch.softmax(logits, dim = -1)
+        return prob
+    
+class MoE(nn.Module):
+    def __init__(self, d_model, d_ffn, num_experts, capacity):
+        super().__init__() 
+        
+        self.capacity = capacity 
+        
+        self.router = Router(d_model, num_experts)
+        
+        self.experts = nn.ModuleList([
+            Expert(d_model, d_ffn) for _ in range(num_experts)
+        ])
+        
+    def forward(self, x):
+        capacity = self.capacity
+        
+        prob = self.router(x)
+        expert_idx = torch.argmax(prob, dim = -1)
+        
+        y = torch.zeros_like(x)
+        
+        before_cnt = []
+        after_cnt = []
+        drop = 0
+        
+        for i in range(len(self.experts)):
+            mask = (expert_idx == i)
+            cnt = mask.sum().item()
+            before_cnt.append(cnt)
+            
+            mask_idx = torch.where(mask)[0]
+            
+            if cnt > capacity:
+                drop += cnt - capacity
+                
+                mask_idx = mask_idx[torch.randperm(len(mask_idx))]
+                mask_idx = mask_idx[ : capacity]
+            x_expert = x[mask_idx]
+            
+            cnt = len(mask_idx)
+            after_cnt.append(cnt)
+            
+            if not cnt:
+                continue
+            
+            cur_prob = prob[mask_idx, i].unsqueeze(-1)            
+            y[mask_idx] = cur_prob * self.experts[i](x_expert)
+            
+        return y, before_cnt, after_cnt, drop
+    
+import matplotlib.pyplot as plt  
+import time
+
+if __name__ == "__main__":
+    d_model = 256
+    d_ffn = 1024
+    num_experts = 8
+    capacity_factor = [
+        x * 0.25 for x in range(2, 9)
+    ]
+    
+    x = torch.randn(10000, d_model)
+    
+    drop_rates = []
+    times = []
+    
+    moe = MoE(d_model, d_ffn, num_experts, capacity = 1)
+    moe.eval()
+    
+    for cf in capacity_factor:
+    
+        c = math.ceil(cf * 10000 / num_experts)
+        
+        moe.capacity = c
+
+        with torch.no_grad() :
+            for _ in range(10):
+                moe(x)
+                
+            t1 = time.perf_counter()
+            
+            for _ in range(50):
+                y, original, adjusted, n_drop = moe(x)
+                
+            t2 = time.perf_counter()
+            
+            times.append((t2 - t1) / 50)
+
+        drop_rates.append(n_drop / x.shape[0])
+        
+    plt.plot(capacity_factor, drop_rates, marker = 'o')
+    plt.xlabel("Capacity Factor")
+    plt.ylabel("Drop Rate")
+    plt.title("How does the Capacity Factor affect the Drop Rate")
+    plt.grid()
+    
+    plt.savefig("Drop_Rate.png")
+    plt.show()
+    
+    plt.plot(capacity_factor, times, marker = 'o')
+    plt.xlabel("Capacity Factor")
+    plt.ylabel("Time_Cost")
+    plt.title("How does the Capacity Factor affect the Time a MoE Forward costs")
+    plt.grid()
+    
+    plt.savefig("Time.png")
+    plt.show()
