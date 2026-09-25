@@ -1,0 +1,3 @@
+/home/zjhsdld/projects/supermarket/modern_cpp/hello_world_project/build/CMakeFiles/main.dir
+/home/zjhsdld/projects/supermarket/modern_cpp/hello_world_project/build/CMakeFiles/edit_cache.dir
+/home/zjhsdld/projects/supermarket/modern_cpp/hello_world_project/build/CMakeFiles/rebuild_cache.dir
