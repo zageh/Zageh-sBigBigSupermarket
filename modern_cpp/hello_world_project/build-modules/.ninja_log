@@ -1,0 +1,11 @@
+# ninja log v7
+0	58	1790423927397517978	CMakeFiles/main.dir/main.cpp.o.ddi	6b1c8dac301f83a5
+1	67	1790423927401603707	CMakeFiles/main.dir/my_module.cpp.o.ddi	bd4373a9b41c3534
+67	74	1790423927466975372	CMakeFiles/main.dir/CXX.dd	9f9cbcba2bcbe382
+67	74	1790423927466975372	/home/zjhsdld/projects/supermarket/modern_cpp/hello_world_project/build-modules/CMakeFiles/main.dir/CXXModules.json	9f9cbcba2bcbe382
+67	74	1790423927466975372	CMakeFiles/main.dir/main.cpp.o.modmap	9f9cbcba2bcbe382
+67	74	1790423927466975372	CMakeFiles/main.dir/my_module.cpp.o.modmap	9f9cbcba2bcbe382
+74	2921	1790423930318604627	CMakeFiles/main.dir/my_module.cpp.o	9717112e88854fe9
+74	2921	1790423930318604627	CMakeFiles/main.dir/my_module.gcm	9717112e88854fe9
+2921	4744	1790423930322689865	CMakeFiles/main.dir/main.cpp.o	5c8d45ede41d835d
+4745	4963	1790423931490222684	main	147901d15cc1f620

@@ -1,0 +1,14 @@
+{
+"rules": [
+{
+"primary-output": "CMakeFiles/main.dir/main.cpp.o",
+"requires": [
+{
+"logical-name": "my_module"
+}
+]
+}
+],
+"version": 0,
+"revision": 0
+}

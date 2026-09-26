@@ -1,0 +1,19 @@
+{
+	"modules" : 
+	{
+		"my_module" : 
+		{
+			"bmi" : "/home/zjhsdld/projects/supermarket/modern_cpp/hello_world_project/build-modules/CMakeFiles/main.dir/my_module.gcm",
+			"is-private" : true
+		}
+	},
+	"references" : 
+	{
+		"my_module" : 
+		{
+			"lookup-method" : "by-name",
+			"path" : "CMakeFiles/main.dir/my_module.gcm"
+		}
+	},
+	"usages" : {}
+}

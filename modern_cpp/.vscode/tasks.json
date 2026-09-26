@@ -1,0 +1,42 @@
+{
+    "tasks": [
+        {
+            "type": "process",
+            "label": "CMake: 配置 C++23 Modules",
+            "command": "/usr/bin/cmake",
+            "args": [
+                "-S",
+                "${workspaceFolder}/hello_world_project",
+                "-B",
+                "${workspaceFolder}/hello_world_project/build-modules",
+                "-G",
+                "Ninja",
+                "-DCMAKE_BUILD_TYPE=Debug"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            "type": "process",
+            "label": "CMake: 构建 C++23 Modules",
+            "command": "/usr/bin/cmake",
+            "args": [
+                "--build",
+                "${workspaceFolder}/hello_world_project/build-modules"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "dependsOn": "CMake: 配置 C++23 Modules",
+            "dependsOrder": "sequence",
+            "problemMatcher": "$gcc",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        }
+    ],
+    "version": "2.0.0"
+}

@@ -153,6 +153,30 @@ main.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/main.cpp.s
 .PHONY : main.cpp.s
 
+my_module.o: my_module.cpp.o
+.PHONY : my_module.o
+
+# target to build an object file
+my_module.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/my_module.cpp.o
+.PHONY : my_module.cpp.o
+
+my_module.i: my_module.cpp.i
+.PHONY : my_module.i
+
+# target to preprocess a source file
+my_module.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/my_module.cpp.i
+.PHONY : my_module.cpp.i
+
+my_module.s: my_module.cpp.s
+.PHONY : my_module.s
+
+# target to generate assembly for a file
+my_module.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/my_module.cpp.s
+.PHONY : my_module.cpp.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -165,6 +189,9 @@ help:
 	@echo "... main.o"
 	@echo "... main.i"
 	@echo "... main.s"
+	@echo "... my_module.o"
+	@echo "... my_module.i"
+	@echo "... my_module.s"
 .PHONY : help
 
 

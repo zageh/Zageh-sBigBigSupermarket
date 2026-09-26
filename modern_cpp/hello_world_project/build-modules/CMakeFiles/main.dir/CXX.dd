@@ -1,0 +1,6 @@
+ninja_dyndep_version = 1.0
+build CMakeFiles/main.dir/main.cpp.o: dyndep | CMakeFiles/main.dir/my_module.gcm
+
+build CMakeFiles/main.dir/my_module.cpp.o | CMakeFiles/main.dir/my_module.gcm: dyndep
+  restat = 1
+

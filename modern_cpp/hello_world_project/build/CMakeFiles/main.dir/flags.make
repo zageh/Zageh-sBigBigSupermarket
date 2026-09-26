@@ -6,5 +6,5 @@ CXX_DEFINES =
 
 CXX_INCLUDES = 
 
-CXX_FLAGS = -fvisibility-inlines-hidden -fmessage-length=0 -march=nocona -mtune=haswell -ftree-vectorize -fPIC -fstack-protector-strong -fno-plt -O2 -ffunction-sections -pipe -isystem /home/zjhsdld/miniconda3/envs/project1/include  -I/home/zjhsdld/miniconda3/envs/project1/targets/x86_64-linux/include  -L/home/zjhsdld/miniconda3/envs/project1/targets/x86_64-linux/lib -L/home/zjhsdld/miniconda3/envs/project1/targets/x86_64-linux/lib/stubs -std=gnu++23
+CXX_FLAGS = -fvisibility-inlines-hidden -fmessage-length=0 -march=nocona -mtune=haswell -ftree-vectorize -fPIC -fstack-protector-strong -fno-plt -O2 -ffunction-sections -pipe -isystem /home/zjhsdld/miniconda3/envs/project1/include  -I/home/zjhsdld/miniconda3/envs/project1/targets/x86_64-linux/include  -L/home/zjhsdld/miniconda3/envs/project1/targets/x86_64-linux/lib -L/home/zjhsdld/miniconda3/envs/project1/targets/x86_64-linux/lib/stubs -std=c++23
 

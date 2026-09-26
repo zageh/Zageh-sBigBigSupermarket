@@ -1,12 +1,17 @@
-#include<print>
-#include<iostream>
-#include<string>
+#include <iostream>
+#include <print>
+#include <string>
 
-int main(){
-    std::print("please enter your name :");
-    std::string name;
-    std::cin >> name;
-    std::println("Hello! {}", name);
+import my_module;
+
+int main() {
+    greeting();
+
+    std::print("please enter the path :");
+    std::string path;
+    std::cin >> path;
+
+    my_module::bulk_rename(path);
 
     return 0;
 }
