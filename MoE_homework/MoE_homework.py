@@ -1,15 +1,19 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
-import math
+class SwiGlu(nn.Module):
+    def forward(self, x):
+        gate, up = x.chunk(2, dim = -1)
+        return F.silu(gate) * up
 
 class Expert(nn.Module):
     def __init__(self, d_model, d_ffn):
         super().__init__()
 
         self.ffn = nn.Sequential(
-            nn.Linear(d_model, d_ffn),
-            nn.GELU(),
+            nn.Linear(d_model, d_ffn << 1),
+            SwiGlu(),
             nn.Linear(d_ffn, d_model)
         )
 
@@ -61,7 +65,7 @@ class MoE(nn.Module):
             if cnt > capacity:
                 drop += cnt - capacity
                 
-                mask_idx = mask_idx[torch.randperm(len(mask_idx))]
+                mask_idx = mask_idx[torch.randperm(int(cnt))]
                 mask_idx = mask_idx[ : capacity]
             x_expert = x[mask_idx]
             
@@ -78,21 +82,24 @@ class MoE(nn.Module):
     
 import matplotlib.pyplot as plt  
 import time
+import math
 
 if __name__ == "__main__":
-    d_model = 256
-    d_ffn = 1024
+    d_model = 16
+    d_ffn = 64
     num_experts = 8
     capacity_factor = [
         x * 0.25 for x in range(2, 9)
     ]
     
-    x = torch.randn(10000, d_model)
+    device = torch.device("cuda")
+    
+    x = torch.randn(10000, d_model, device=device)
     
     drop_rates = []
     times = []
     
-    moe = MoE(d_model, d_ffn, num_experts, capacity = 1)
+    moe = MoE(d_model, d_ffn, num_experts, capacity = 1).to(device)
     moe.eval()
     
     for cf in capacity_factor:
@@ -104,12 +111,14 @@ if __name__ == "__main__":
         with torch.no_grad() :
             for _ in range(10):
                 moe(x)
-                
+            
+            torch.cuda.synchronize()   
             t1 = time.perf_counter()
             
             for _ in range(50):
                 y, original, adjusted, n_drop = moe(x)
                 
+            torch.cuda.synchronize()
             t2 = time.perf_counter()
             
             times.append((t2 - t1) / 50)
