@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "diy-llm"
+version = "0.1.0"
+description = "从零手搓 LLM：diy-llm / CS336 中文课程的自学实现"
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.4",
+    "numpy",
+    "tqdm",
+    "regex",
+    "tokenizers",
+    "transformers",
+    "datasets",
+    "matplotlib",
+    "psutil",
+    "wandb",
+    "pytest",
+]
+
+[project.optional-dependencies]
+triton = ["triton>=3.0"]
+align = ["peft", "accelerate", "vllm"]
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

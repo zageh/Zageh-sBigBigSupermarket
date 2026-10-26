@@ -1,0 +1,21 @@
+# 数据与权重（不入库）
+data/
+ckpt/
+outputs/
+ref/
+wandb/
+*.bin
+*.txt
+!README*.txt
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# 环境
+.env
+.DS_Store
