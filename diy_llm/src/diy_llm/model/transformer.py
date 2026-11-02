@@ -19,10 +19,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 import os
 import json
-from transformers import PreTrainedTokenizerFast    
+from transformers import PreTrainedTokenizerFast  
+from dataclasses import dataclass  
 
 class RMSNorm(nn.Module):
     def __init__(self, d_model, eps = 1e-5, device = None, dtype = None):
+        super().__init__()
         self.eps = eps
         self.weight = nn.Parameter(torch.ones(d_model, device= device, dtype= dtype))
         
@@ -50,7 +52,7 @@ class SwiGLU(nn.Module):
 class RotaryPositionEmbedding(nn.Module):
     def __init__(self, theta: float, d_k: int):
         super().__init__()
-        assert d_k ^ 1, "d_k 必须为偶数"
+        assert d_k & 1, "d_k 必须为偶数"
         self.d_k = d_k
         self.theta = theta
         self.register_buffer("cos", None, persistent= False)
@@ -72,8 +74,8 @@ class RotaryPositionEmbedding(nn.Module):
         B, H, T, D = x.shape
         self._build_cache(T, x.device, x.dtype)
         
-        cos = self.cos[:T, :].view(1, 1, T, D<<1)
-        sin = self.sin[:T, :].view(1, 1, T, D<<1)
+        cos = self.cos[:T, :].view(1, 1, T, D>>1)
+        sin = self.sin[:T, :].view(1, 1, T, D>>1)
         x_even = x[..., 0 :: 2]
         x_odd  = x[..., 1 :: 2]
         x_rot_even = x_even * cos - x_odd * sin
@@ -84,6 +86,14 @@ class RotaryPositionEmbedding(nn.Module):
         x_rot[..., 1::2] = x_rot_odd
         
         return x_rot
+    
+@dataclass
+class ModelConfig:
+    vocab_size: int
+    d_model: int
+    num_heads: int
+    num_layers: int
+    max_seq_len: int
     
 class MultiHeadAttention(nn.Module):
     def __init__(self, d_model, num_heads):
@@ -111,7 +121,7 @@ class MultiHeadAttention(nn.Module):
         if self.flash:
             out = F.scaled_dot_product_attention(
                 q, k, v,
-                attn_mask= mask,
+                attn_mask= None,
                 dropout_p= 0,
                 is_causal= True,
             )
@@ -135,12 +145,12 @@ class TransformerBlock(nn.Module):
         self.norm2 = RMSNorm(d_model)
         
     def forward(self, x, mask = None):
-        x = x + self.attention(self.norm1, mask)
+        x = x + self.attention(self.norm1(x), mask)
         x = x + self.ffn(self.norm2(x))
         return x
     
 class TransformerLM(nn.Module):
-    def __init__(self, vocab_size, d_model, num_heads, num_layers, max_seq_len):
+    def __init__(self, vocab_size, d_model, num_heads, num_layers, max_seq_len, config: ModelConfig):
         super().__init__()
         self.token_embedding = nn.Embedding(vocab_size, d_model)
         self.layers = nn.ModuleList([TransformerBlock(d_model, num_heads) for _ in range(num_layers)])
@@ -148,13 +158,7 @@ class TransformerLM(nn.Module):
         self.lm_head = nn.Linear(d_model, vocab_size)
         self.max_seq_len = max_seq_len
         
-        self.config = {
-            "vocab_size": vocab_size,
-            "context_length": max_seq_len,
-            "num_layers": num_layers,
-            "num_heads": num_heads,
-            "d_model": d_model,
-        }
+        self.config = config
         
     def forward(self, idx):
         B, T = idx.shape
@@ -169,7 +173,7 @@ class TransformerLM(nn.Module):
     @torch.no_grad()
     def generate(self, idx, max_new_tokens, temperature = 1.0, top_k = None):
         for _ in range(max_new_tokens):
-            idx_cond = idx if idx.size(1) <= self.max_seq_len else idx[:, :-self.max_seq_len]
+            idx_cond = idx if idx.size(1) <= self.max_seq_len else idx[:, -self.max_seq_len:]
             logits = self(idx_cond)
             logits = logits[:, -1, :] / temperature
             
@@ -196,3 +200,158 @@ class SimpleTokenizer:
     
     def decode(self, ids):
         return "".join([self.id_to_token.get(i, "<unk>") for i in ids])
+    
+@torch.no_grad()
+def generate_with_sampling(
+    model,
+    idx,
+    max_new_tokens,
+    temperature = 1.0,
+    top_k = None,
+    top_p = None,
+):
+    model.eval()
+    
+    special_ids = [0, 1, 2, 3, 4]
+    for _ in range(max_new_tokens):
+        idx_cond = idx if idx.size(1) <= model.max_seq_len else idx[:, -model.max_seq_len:]
+        
+        logits = model(idx_cond)[:,-1,:]
+        
+        temperature = max(temperature, 1e-5)
+        logits = logits / temperature
+        
+        if top_k is not None:
+            top_k = min(top_k, logits.size(-1))
+            v, _ = torch.topk(logits, top_k)
+            logits[logits < v[:, [-1]]] = - float('inf')
+            
+        if top_p is not None:
+            sorted_logits, sorted_idx = torch.sort(logits, descending= True)
+            
+            sorted_logits = sorted_logits - sorted_logits.max(dim = -1, keepdim=True).values
+            
+            sorted_probs = torch.softmax(sorted_logits, dim=-1)
+            cum_probs = torch.cumsum(sorted_probs, dim=-1)
+            
+            mask = cum_probs > top_p
+            mask[..., 1:] = mask[..., : -1].clone()
+            mask[..., 0] = False
+            
+            sorted_logits[mask] = -float('inf')
+            logits.scatter_(dim=-1, index = sorted_idx, src = sorted_logits)
+        
+        for i in special_ids:
+            logits[:, i ] = -float('inf')
+            
+        logits = logits - logits.max(dim=-1, keepdim = True).values
+        probs = torch.softmax(logits, dim=-1)
+        
+        if torch.isnan(probs).any() or torch.isinf(probs).any() or (probs < 0).any():
+                probs = torch.ones_like(probs)
+                probs = probs / probs.sum(dim=-1, keepdim=True) 
+                    
+        idx_next = torch.multinomial(probs, num_samples=1)
+        idx = torch.cat((idx, idx_next), dim = -1)
+        
+    return idx
+
+def decode_generated_text(
+    model, tokenizer, prompt, 
+    max_new_tokens = 50, temperature = 1.0, 
+    top_k = None, top_p = None,
+    device = "cuda",
+    ):
+    model.eval()
+    model.to(device)
+    idx = torch.tensor([tokenizer.encode(prompt)], device=device)
+    
+    genterated_idx = generate_with_sampling(model, idx, max_new_tokens=max_new_tokens,
+                                           temperature=temperature, top_k=top_k, top_p=top_p)
+    return tokenizer.decode(genterated_idx[0].tolist())
+
+class CustomAdamW(torch.optim.Optimizer):
+    def __init__(self, params, lr=1e-3, betas=(0.9, 0.95), eps=1e-8, weight_decay=0.0):
+        if lr<= 0.0: raise ValueError(f"Invalid learning rate: {lr}")
+        defaults = dict(lr = lr, betas = betas, eps = eps, weight_decay=weight_decay)
+        
+        super().__init__(params, defaults)
+        
+    @torch.no_grad()
+    def step(self, closure = None):
+        loss = None
+        if closure is not None:
+            with torch.enable_grad(): loss = closure()
+        for group in self.param_groups:
+            lr = group['lr']
+            beta1, beta2 = group['betas']
+            eps = group['eps']
+            weight_decay = group['weight_decay']
+            
+            for param in group['params']:
+                if param.grad is None: continue
+                
+                grad = param.grad
+                state = self.state[param]
+                if len(state) == 0:
+                    state["step"] = 0
+                    state["exp_avg"] = torch.zeros_like(param)
+                    state["exp_avg_sq"] = torch.zeros_like(param)
+
+                exp_avg, exp_avg_sq = state["exp_avg"], state["exp_avg_sq"]
+                state["step"] += 1
+                t = state["step"]
+                exp_avg.mul_(beta1).add_(grad, alpha=1 - beta1)
+                exp_avg_sq.mul_(beta2).addcmul_(grad, grad, value=1 - beta2)
+
+                # Correct bias correction logic
+                bias_correction1 = 1 - beta1 ** t
+                bias_correction2 = 1 - beta2 ** t
+
+                step_size = lr * (math.sqrt(bias_correction2) / bias_correction1)
+                denom = exp_avg_sq.sqrt().add_(eps)
+
+                param.addcdiv_(exp_avg, denom, value=-step_size)
+                if weight_decay != 0:
+                    param.add_(param, alpha=-lr * weight_decay)
+        return loss             
+    
+if __name__ == "__main__":
+
+    tokenizer = PreTrainedTokenizerFast(
+        tokenizer_file="bpe_tokenizer/tokenizer.json"
+    )
+
+    vocab_size = tokenizer.vocab_size
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    model = TransformerLM(vocab_size=vocab_size, d_model=256, num_heads=8, num_layers=6, max_seq_len=128)
+
+    if os.path.exists("ckpt/epoch_5.pt"):
+        ckpt = torch.load("ckpt/epoch_5.pt", map_location=device)
+
+        model.load_state_dict(ckpt["model"])
+
+        optimizer = CustomAdamW(model.parameters(), lr=2e-4, weight_decay=0.1)
+        optimizer.load_state_dict(ckpt["optimizer"])
+
+        global_step = ckpt["iteration"]
+        start_epoch = ckpt["epoch"]
+        print(ckpt["config"])
+        
+        print(f"[INFO] 成功加载权重文件，使用设备: {device}")
+    else:
+        print("[WARNING] 权重文件不存在，使用随机初始化模型")
+
+    model.to(device)
+    model.eval()
+
+    prompt = "Lily like play computer games"
+    generated_text = decode_generated_text(model, tokenizer, prompt,
+                                           max_new_tokens=60,
+                                           temperature=0.8,
+                                           top_k=None,
+                                           top_p=0.9,
+                                           device=device)
+    print("Generated:", generated_text)
