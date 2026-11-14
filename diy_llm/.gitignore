@@ -19,3 +19,5 @@ __pycache__/
 # 环境
 .env
 .DS_Store
+
+*ref/
